@@ -78,6 +78,9 @@ public class VectorDatabaseService {
 
     private SearchRequest buildVectorSearchRequest(String query, Integer limit, Integer offset, com.ecommerce.search.SearchRequest.SearchFilters filters) {
         List<Double> queryVector = embeddingService.generateEmbedding(query);
+        if (queryVector == null || queryVector.isEmpty()) {
+            throw new RuntimeException("Failed to generate embedding for query: " + query);
+        }
         List<Float> queryVectorFloats = queryVector.stream().map(Double::floatValue).collect(Collectors.toList());
 
         var knnBuilder = SearchRequest.of(s -> {
