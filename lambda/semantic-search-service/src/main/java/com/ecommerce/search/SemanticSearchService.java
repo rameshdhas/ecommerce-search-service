@@ -32,7 +32,9 @@ public class SemanticSearchService {
             return new SearchResponse(products, total, request.getLimit(), request.getOffset(), processingTime);
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed to perform semantic search", e);
+            System.out.println("Search error: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to perform semantic search: " + e.getMessage(), e);
         }
     }
 }

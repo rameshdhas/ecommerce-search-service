@@ -13,7 +13,7 @@ public class SemanticSearchApplication {
         SpringApplication.run(SemanticSearchApplication.class, args);
     }
 
-    @Bean
+    @Bean("semanticSearch")
     public Function<SearchRequest, SearchResponse> semanticSearch(SemanticSearchService searchService) {
         return searchService::search;
     }

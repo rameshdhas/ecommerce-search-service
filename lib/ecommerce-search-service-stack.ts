@@ -10,12 +10,48 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    // Create security policy for encryption
+    const encryptionPolicy = new opensearch.CfnSecurityPolicy(this, 'EncryptionPolicy', {
+      name: 'ecommerce-products-encryption',
+      type: 'encryption',
+      policy: JSON.stringify({
+        Rules: [
+          {
+            ResourceType: 'collection',
+            Resource: ['collection/ecommerce-products']
+          }
+        ],
+        AWSOwnedKey: true
+      })
+    });
+
+    // Create security policy for network access
+    const networkPolicy = new opensearch.CfnSecurityPolicy(this, 'NetworkPolicy', {
+      name: 'ecommerce-products-network',
+      type: 'network',
+      policy: JSON.stringify([
+        {
+          Rules: [
+            {
+              ResourceType: 'collection',
+              Resource: ['collection/ecommerce-products']
+            }
+          ],
+          AllowFromPublic: true
+        }
+      ])
+    });
+
     // OpenSearch Serverless Collection for vector search
     const searchCollection = new opensearch.CfnCollection(this, 'SearchCollection', {
       name: 'ecommerce-products',
       type: 'VECTORSEARCH',
       description: 'Vector search collection for ecommerce products',
     });
+
+    // Make collection depend on security policies
+    searchCollection.addDependency(encryptionPolicy);
+    searchCollection.addDependency(networkPolicy);
 
     // Create IAM role for Lambda function
     const lambdaRole = new iam.Role(this, 'SemanticSearchLambdaRole', {
@@ -38,6 +74,41 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
       },
     });
 
+    // Create data access policy for Lambda role
+    const dataAccessPolicy = new opensearch.CfnAccessPolicy(this, 'DataAccessPolicy', {
+      name: 'ecommerce-products-data-access',
+      type: 'data',
+      policy: JSON.stringify([
+        {
+          Rules: [
+            {
+              ResourceType: 'collection',
+              Resource: ['collection/ecommerce-products'],
+              Permission: [
+                'aoss:CreateCollectionItems',
+                'aoss:DeleteCollectionItems',
+                'aoss:UpdateCollectionItems',
+                'aoss:DescribeCollectionItems'
+              ]
+            },
+            {
+              ResourceType: 'index',
+              Resource: ['index/ecommerce-products/*'],
+              Permission: [
+                'aoss:CreateIndex',
+                'aoss:DeleteIndex',
+                'aoss:UpdateIndex',
+                'aoss:DescribeIndex',
+                'aoss:ReadDocument',
+                'aoss:WriteDocument'
+              ]
+            }
+          ],
+          Principal: [lambdaRole.roleArn]
+        }
+      ])
+    });
+
     // Create the Lambda function
     const semanticSearchFunction = new lambda.Function(this, 'SemanticSearchFunction', {
       runtime: lambda.Runtime.JAVA_17,
@@ -48,7 +119,7 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
           command: [
             '/bin/sh',
             '-c',
-            'mvn clean package -DskipTests && cp target/semantic-search-service-1.0.0-aws.jar /opt/target/',
+            'mvn clean package -DskipTests && cp target/semantic-search-service-1.0.0-aws.jar /asset-output/',
           ],
           user: 'root',
         },

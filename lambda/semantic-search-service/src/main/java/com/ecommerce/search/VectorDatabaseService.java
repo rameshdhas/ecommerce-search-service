@@ -1,172 +1,219 @@
 package com.ecommerce.search;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.query_dsl.*;
+import co.elastic.clients.elasticsearch.core.SearchRequest;
+import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 public class VectorDatabaseService {
 
-    private final WebClient webClient;
+    private final ElasticsearchClient elasticsearchClient;
     private final ObjectMapper objectMapper;
-    private final String vectorDbEndpoint;
     private final String indexName;
+    private final EmbeddingService embeddingService;
 
+    @Autowired
     public VectorDatabaseService(
-            @Value("${vector.db.endpoint}") String vectorDbEndpoint,
-            @Value("${vector.db.index:products}") String indexName) {
-        this.vectorDbEndpoint = vectorDbEndpoint;
+            ElasticsearchClient elasticsearchClient,
+            EmbeddingService embeddingService,
+            @Value("${elasticsearch.index:ecommerce-products}") String indexName) {
+        this.elasticsearchClient = elasticsearchClient;
+        this.embeddingService = embeddingService;
         this.indexName = indexName;
-        this.webClient = WebClient.builder()
-                .baseUrl(vectorDbEndpoint)
-                .build();
         this.objectMapper = new ObjectMapper();
     }
 
-    public List<SearchResponse.Product> semanticSearch(String query, Integer limit, Integer offset, SearchRequest.SearchFilters filters) {
+    public List<com.ecommerce.search.SearchResponse.Product> semanticSearch(String query, Integer limit, Integer offset, com.ecommerce.search.SearchRequest.SearchFilters filters) {
         try {
-            Map<String, Object> searchQuery = buildVectorSearchQuery(query, limit, offset, filters);
+            // Try vector search first, fallback to text search if vector fields don't exist
+            SearchRequest searchRequest;
+            try {
+                searchRequest = buildVectorSearchRequest(query, limit, offset, filters);
+                SearchResponse<Object> response = elasticsearchClient.search(searchRequest, Object.class);
+                return parseSearchResults(response);
+            } catch (Exception vectorError) {
+                System.out.println("Vector search failed, falling back to text search: " + vectorError.getMessage());
+                // Fallback to text-based search
+                searchRequest = buildTextSearchRequest(query, limit, offset, filters);
+                SearchResponse<Object> response = elasticsearchClient.search(searchRequest, Object.class);
+                return parseSearchResults(response);
+            }
 
-            String response = webClient.post()
-                    .uri("/{index}/_search", indexName)
-                    .bodyValue(searchQuery)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-            return parseSearchResults(response);
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute vector search", e);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to execute search: " + e.getMessage(), e);
         }
     }
 
-    public long getTotalCount(String query, SearchRequest.SearchFilters filters) {
+    public long getTotalCount(String query, com.ecommerce.search.SearchRequest.SearchFilters filters) {
         try {
-            Map<String, Object> countQuery = buildCountQuery(query, filters);
+            SearchRequest searchRequest = SearchRequest.of(s -> s
+                    .index(indexName)
+                    .size(0)
+                    .query(buildTextQuery(query, filters))
+            );
 
-            String response = webClient.post()
-                    .uri("/{index}/_count", indexName)
-                    .bodyValue(countQuery)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
+            SearchResponse<Object> response = elasticsearchClient.search(searchRequest, Object.class);
+            return response.hits().total().value();
 
-            JsonNode jsonResponse = objectMapper.readTree(response);
-            return jsonResponse.get("count").asLong();
-
-        } catch (Exception e) {
+        } catch (IOException e) {
+            System.out.println("Failed to get total count: " + e.getMessage());
             return 0L;
         }
     }
 
-    private Map<String, Object> buildVectorSearchQuery(String query, Integer limit, Integer offset, SearchRequest.SearchFilters filters) {
-        Map<String, Object> searchQuery = new HashMap<>();
-        searchQuery.put("size", limit);
-        searchQuery.put("from", offset);
+    private SearchRequest buildVectorSearchRequest(String query, Integer limit, Integer offset, com.ecommerce.search.SearchRequest.SearchFilters filters) {
+        List<Double> queryVector = embeddingService.generateEmbedding(query);
+        List<Float> queryVectorFloats = queryVector.stream().map(Double::floatValue).collect(Collectors.toList());
 
-        Map<String, Object> queryObj = new HashMap<>();
-
-        Map<String, Object> knnQuery = new HashMap<>();
-        knnQuery.put("field", "description_vector");
-        knnQuery.put("query_vector", generateQueryVector(query));
-        knnQuery.put("k", limit + offset);
-        knnQuery.put("num_candidates", Math.max(100, (limit + offset) * 2));
-
-        if (filters != null) {
-            List<Map<String, Object>> filterConditions = buildFilterConditions(filters);
-            if (!filterConditions.isEmpty()) {
-                Map<String, Object> boolQuery = new HashMap<>();
-                boolQuery.put("must", filterConditions);
-                knnQuery.put("filter", boolQuery);
-            }
-        }
-
-        queryObj.put("knn", knnQuery);
-        searchQuery.put("query", queryObj);
-
-        Map<String, Object> source = new HashMap<>();
-        source.put("includes", Arrays.asList("id", "name", "description", "price", "category", "brand", "image_url"));
-        searchQuery.put("_source", source);
-
-        return searchQuery;
+        return SearchRequest.of(s -> s
+                .index(indexName)
+                .size(limit)
+                .from(offset)
+                .knn(knn -> knn
+                        .field("embeddings")
+                        .queryVector(queryVectorFloats)
+                        .k(limit + offset)
+                        .numCandidates(Math.max(100, (limit + offset) * 2))
+                        .filter(buildFilterQuery(filters))
+                )
+                .source(src -> src
+                        .filter(f -> f
+                                .includes("id", "title", "url", "image_url", "text_content", "metadata")
+                        )
+                )
+        );
     }
 
-    private Map<String, Object> buildCountQuery(String query, SearchRequest.SearchFilters filters) {
-        Map<String, Object> countQuery = new HashMap<>();
-
-        if (filters != null) {
-            List<Map<String, Object>> filterConditions = buildFilterConditions(filters);
-            if (!filterConditions.isEmpty()) {
-                Map<String, Object> boolQuery = new HashMap<>();
-                boolQuery.put("must", filterConditions);
-                countQuery.put("query", Map.of("bool", boolQuery));
-            }
-        }
-
-        if (countQuery.isEmpty()) {
-            countQuery.put("query", Map.of("match_all", Map.of()));
-        }
-
-        return countQuery;
+    private SearchRequest buildTextSearchRequest(String query, Integer limit, Integer offset, com.ecommerce.search.SearchRequest.SearchFilters filters) {
+        return SearchRequest.of(s -> s
+                .index(indexName)
+                .size(limit)
+                .from(offset)
+                .query(buildTextQuery(query, filters))
+                .source(src -> src
+                        .filter(f -> f
+                                .includes("id", "title", "url", "image_url", "text_content", "metadata")
+                        )
+                )
+        );
     }
 
-    private List<Map<String, Object>> buildFilterConditions(SearchRequest.SearchFilters filters) {
-        List<Map<String, Object>> conditions = new ArrayList<>();
+    private Query buildTextQuery(String query, com.ecommerce.search.SearchRequest.SearchFilters filters) {
+        List<Query> mustClauses = new ArrayList<>();
+
+        // Add text search if query is provided
+        if (query != null && !query.trim().isEmpty()) {
+            mustClauses.add(Query.of(q -> q
+                    .multiMatch(mm -> mm
+                            .query(query)
+                            .fields("title^2", "text_content")
+                            .type(co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType.BestFields)
+                    )
+            ));
+        }
+
+        // Add filters
+        Query filterQuery = buildFilterQuery(filters);
+        if (!isMatchAllQuery(filterQuery)) {
+            mustClauses.add(filterQuery);
+        }
+
+        if (mustClauses.isEmpty()) {
+            return Query.of(q -> q.matchAll(ma -> ma));
+        } else if (mustClauses.size() == 1) {
+            return mustClauses.get(0);
+        } else {
+            return Query.of(q -> q.bool(b -> b.must(mustClauses)));
+        }
+    }
+
+    private boolean isMatchAllQuery(Query query) {
+        return query.isMatchAll();
+    }
+
+    private Query buildFilterQuery(com.ecommerce.search.SearchRequest.SearchFilters filters) {
+        if (filters == null) {
+            return Query.of(q -> q.matchAll(ma -> ma));
+        }
+
+        List<Query> mustClauses = new ArrayList<>();
 
         if (filters.getCategory() != null && !filters.getCategory().trim().isEmpty()) {
-            conditions.add(Map.of("term", Map.of("category.keyword", filters.getCategory())));
+            mustClauses.add(Query.of(q -> q
+                    .term(t -> t
+                            .field("metadata.categories")
+                            .value(filters.getCategory())
+                    )
+            ));
         }
 
         if (filters.getBrand() != null && !filters.getBrand().trim().isEmpty()) {
-            conditions.add(Map.of("term", Map.of("brand.keyword", filters.getBrand())));
+            mustClauses.add(Query.of(q -> q
+                    .term(t -> t
+                            .field("metadata.brand")
+                            .value(filters.getBrand())
+                    )
+            ));
         }
 
         if (filters.getPriceMin() != null || filters.getPriceMax() != null) {
-            Map<String, Object> rangeCondition = new HashMap<>();
-            if (filters.getPriceMin() != null) {
-                rangeCondition.put("gte", filters.getPriceMin());
-            }
-            if (filters.getPriceMax() != null) {
-                rangeCondition.put("lte", filters.getPriceMax());
-            }
-            conditions.add(Map.of("range", Map.of("price", rangeCondition)));
+            mustClauses.add(Query.of(q -> q
+                    .range(r -> {
+                        var rangeQuery = r.field("metadata.final_price");
+                        if (filters.getPriceMin() != null) {
+                            rangeQuery.gte(co.elastic.clients.json.JsonData.of(filters.getPriceMin()));
+                        }
+                        if (filters.getPriceMax() != null) {
+                            rangeQuery.lte(co.elastic.clients.json.JsonData.of(filters.getPriceMax()));
+                        }
+                        return rangeQuery;
+                    })
+            ));
         }
 
-        return conditions;
+        if (mustClauses.isEmpty()) {
+            return Query.of(q -> q.matchAll(ma -> ma));
+        }
+
+        return Query.of(q -> q
+                .bool(b -> b.must(mustClauses))
+        );
     }
 
-    private List<Double> generateQueryVector(String query) {
-        Random random = new Random(query.hashCode());
-        return random.doubles(768, -1.0, 1.0)
-                .boxed()
-                .collect(Collectors.toList());
-    }
 
-    private List<SearchResponse.Product> parseSearchResults(String response) {
+
+    private List<com.ecommerce.search.SearchResponse.Product> parseSearchResults(SearchResponse<Object> response) {
         try {
-            JsonNode jsonResponse = objectMapper.readTree(response);
-            JsonNode hits = jsonResponse.get("hits").get("hits");
+            List<com.ecommerce.search.SearchResponse.Product> products = new ArrayList<>();
 
-            List<SearchResponse.Product> products = new ArrayList<>();
-            for (JsonNode hit : hits) {
-                JsonNode source = hit.get("_source");
-                double score = hit.get("_score").asDouble();
+            for (Hit<Object> hit : response.hits().hits()) {
+                Map<String, Object> source = (Map<String, Object>) hit.source();
+                double score = hit.score() != null ? hit.score() : 0.0;
 
-                SearchResponse.Product product = new SearchResponse.Product(
-                        source.get("id").asText(),
-                        source.get("name").asText(),
-                        source.get("description").asText(),
-                        source.get("price").asDouble(),
-                        source.get("category").asText(),
-                        source.get("brand").asText(),
-                        source.has("image_url") ? source.get("image_url").asText() : null,
+                Map<String, Object> metadata = (Map<String, Object>) source.get("metadata");
+                if (metadata == null) {
+                    metadata = new HashMap<>();
+                }
+
+                com.ecommerce.search.SearchResponse.Product product = new com.ecommerce.search.SearchResponse.Product(
+                        (String) source.get("id"),
+                        (String) source.get("title"),
+                        (String) source.get("text_content"),
+                        metadata.get("final_price") != null ? ((Number) metadata.get("final_price")).doubleValue() : 0.0,
+                        (String) metadata.get("categories"),
+                        (String) metadata.get("brand"),
+                        (String) source.get("image_url"),
                         score
                 );
                 products.add(product);
