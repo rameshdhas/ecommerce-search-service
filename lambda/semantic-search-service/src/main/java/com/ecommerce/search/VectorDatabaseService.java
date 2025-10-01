@@ -44,6 +44,10 @@ public class VectorDatabaseService {
                 return parseSearchResults(response);
             } catch (Exception vectorError) {
                 System.out.println("Vector search failed, falling back to text search: " + vectorError.getMessage());
+                System.out.println("Vector error details: " + vectorError.getClass().getSimpleName());
+                if (vectorError.getCause() != null) {
+                    System.out.println("Vector error cause: " + vectorError.getCause().getMessage());
+                }
                 // Fallback to text-based search
                 searchRequest = buildTextSearchRequest(query, limit, offset, filters);
                 SearchResponse<Object> response = elasticsearchClient.search(searchRequest, Object.class);
@@ -76,23 +80,35 @@ public class VectorDatabaseService {
         List<Double> queryVector = embeddingService.generateEmbedding(query);
         List<Float> queryVectorFloats = queryVector.stream().map(Double::floatValue).collect(Collectors.toList());
 
-        return SearchRequest.of(s -> s
-                .index(indexName)
-                .size(limit)
-                .from(offset)
-                .knn(knn -> knn
-                        .field("embeddings")
+        var knnBuilder = SearchRequest.of(s -> {
+            var searchBuilder = s.index(indexName)
+                    .size(limit)
+                    .from(offset);
+
+            // Build the KNN query
+            var knnQuery = searchBuilder.knn(knn -> {
+                var kb = knn.field("embeddings")
                         .queryVector(queryVectorFloats)
                         .k(limit + offset)
-                        .numCandidates(Math.max(100, (limit + offset) * 2))
-                        .filter(buildFilterQuery(filters))
-                )
-                .source(src -> src
-                        .filter(f -> f
-                                .includes("id", "title", "url", "image_url", "text_content", "metadata")
-                        )
-                )
-        );
+                        .numCandidates(Math.max(100, (limit + offset) * 2));
+
+                // Only add filter if there are actual filters
+                Query filterQuery = buildFilterQuery(filters);
+                if (!isMatchAllQuery(filterQuery)) {
+                    kb.filter(filterQuery);
+                }
+                return kb;
+            });
+
+            // Add source filtering
+            return knnQuery.source(src -> src
+                    .filter(f -> f
+                            .includes("id", "title", "url", "image_url", "text_content", "metadata")
+                    )
+            );
+        });
+
+        return knnBuilder;
     }
 
     private SearchRequest buildTextSearchRequest(String query, Integer limit, Integer offset, com.ecommerce.search.SearchRequest.SearchFilters filters) {

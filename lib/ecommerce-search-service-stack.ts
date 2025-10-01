@@ -2,56 +2,12 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
-import * as opensearch from 'aws-cdk-lib/aws-opensearchserverless';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
 
 export class EcommerceSearchServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-
-    // Create security policy for encryption
-    const encryptionPolicy = new opensearch.CfnSecurityPolicy(this, 'EncryptionPolicy', {
-      name: 'ecommerce-products-encryption',
-      type: 'encryption',
-      policy: JSON.stringify({
-        Rules: [
-          {
-            ResourceType: 'collection',
-            Resource: ['collection/ecommerce-products']
-          }
-        ],
-        AWSOwnedKey: true
-      })
-    });
-
-    // Create security policy for network access
-    const networkPolicy = new opensearch.CfnSecurityPolicy(this, 'NetworkPolicy', {
-      name: 'ecommerce-products-network',
-      type: 'network',
-      policy: JSON.stringify([
-        {
-          Rules: [
-            {
-              ResourceType: 'collection',
-              Resource: ['collection/ecommerce-products']
-            }
-          ],
-          AllowFromPublic: true
-        }
-      ])
-    });
-
-    // OpenSearch Serverless Collection for vector search
-    const searchCollection = new opensearch.CfnCollection(this, 'SearchCollection', {
-      name: 'ecommerce-products',
-      type: 'VECTORSEARCH',
-      description: 'Vector search collection for ecommerce products',
-    });
-
-    // Make collection depend on security policies
-    searchCollection.addDependency(encryptionPolicy);
-    searchCollection.addDependency(networkPolicy);
 
     // Create IAM role for Lambda function
     const lambdaRole = new iam.Role(this, 'SemanticSearchLambdaRole', {
@@ -60,53 +16,20 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
         iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
       ],
       inlinePolicies: {
-        OpenSearchAccess: new iam.PolicyDocument({
+        BedrockAccess: new iam.PolicyDocument({
           statements: [
             new iam.PolicyStatement({
               effect: iam.Effect.ALLOW,
               actions: [
-                'aoss:APIAccessAll',
+                'bedrock:InvokeModel',
               ],
-              resources: [searchCollection.attrArn],
+              resources: [
+                'arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1'
+              ],
             }),
           ],
         }),
       },
-    });
-
-    // Create data access policy for Lambda role
-    const dataAccessPolicy = new opensearch.CfnAccessPolicy(this, 'DataAccessPolicy', {
-      name: 'ecommerce-products-data-access',
-      type: 'data',
-      policy: JSON.stringify([
-        {
-          Rules: [
-            {
-              ResourceType: 'collection',
-              Resource: ['collection/ecommerce-products'],
-              Permission: [
-                'aoss:CreateCollectionItems',
-                'aoss:DeleteCollectionItems',
-                'aoss:UpdateCollectionItems',
-                'aoss:DescribeCollectionItems'
-              ]
-            },
-            {
-              ResourceType: 'index',
-              Resource: ['index/ecommerce-products/*'],
-              Permission: [
-                'aoss:CreateIndex',
-                'aoss:DeleteIndex',
-                'aoss:UpdateIndex',
-                'aoss:DescribeIndex',
-                'aoss:ReadDocument',
-                'aoss:WriteDocument'
-              ]
-            }
-          ],
-          Principal: [lambdaRole.roleArn]
-        }
-      ])
     });
 
     // Create the Lambda function
@@ -119,7 +42,7 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
           command: [
             '/bin/sh',
             '-c',
-            'mvn clean package -DskipTests && cp target/semantic-search-service-1.0.0-aws.jar /asset-output/',
+            'mvn clean package -DskipTests && cp target/semantic-search-service-1.0.0.jar /asset-output/',
           ],
           user: 'root',
         },
@@ -129,8 +52,6 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
       role: lambdaRole,
       environment: {
         SPRING_CLOUD_FUNCTION_DEFINITION: 'semanticSearch',
-        VECTOR_DB_ENDPOINT: searchCollection.attrCollectionEndpoint,
-        VECTOR_DB_INDEX: 'products',
       },
     });
 
@@ -199,12 +120,6 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ApiEndpoint', {
       value: api.url,
       description: 'API Gateway endpoint URL',
-    });
-
-    // Output the OpenSearch collection endpoint
-    new cdk.CfnOutput(this, 'OpenSearchEndpoint', {
-      value: searchCollection.attrCollectionEndpoint,
-      description: 'OpenSearch Serverless collection endpoint',
     });
 
     // Output the Lambda function name
