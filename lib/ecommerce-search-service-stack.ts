@@ -73,48 +73,7 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
 
     // Create the search resource and POST method
     const searchResource = api.root.addResource('search');
-    searchResource.addMethod('POST', lambdaIntegration, {
-      requestValidator: new apigateway.RequestValidator(this, 'SearchRequestValidator', {
-        restApi: api,
-        validateRequestBody: true,
-        requestValidatorName: 'search-request-validator',
-      }),
-      requestModels: {
-        'application/json': new apigateway.Model(this, 'SearchRequestModel', {
-          restApi: api,
-          contentType: 'application/json',
-          modelName: 'SearchRequest',
-          schema: {
-            type: apigateway.JsonSchemaType.OBJECT,
-            properties: {
-              query: {
-                type: apigateway.JsonSchemaType.STRING,
-                minLength: 1,
-              },
-              limit: {
-                type: apigateway.JsonSchemaType.INTEGER,
-                minimum: 1,
-                maximum: 100,
-              },
-              offset: {
-                type: apigateway.JsonSchemaType.INTEGER,
-                minimum: 0,
-              },
-              filters: {
-                type: apigateway.JsonSchemaType.OBJECT,
-                properties: {
-                  category: { type: apigateway.JsonSchemaType.STRING },
-                  priceMin: { type: apigateway.JsonSchemaType.NUMBER },
-                  priceMax: { type: apigateway.JsonSchemaType.NUMBER },
-                  brand: { type: apigateway.JsonSchemaType.STRING },
-                },
-              },
-            },
-            required: ['query'],
-          },
-        }),
-      },
-    });
+    searchResource.addMethod('POST', lambdaIntegration);
 
     // Output the API endpoint
     new cdk.CfnOutput(this, 'ApiEndpoint', {

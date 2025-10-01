@@ -77,10 +77,13 @@ public class VectorDatabaseService {
     }
 
     private SearchRequest buildVectorSearchRequest(String query, Integer limit, Integer offset, com.ecommerce.search.SearchRequest.SearchFilters filters) {
+        System.out.println("Generating embedding for query: " + query);
         List<Double> queryVector = embeddingService.generateEmbedding(query);
         if (queryVector == null || queryVector.isEmpty()) {
+            System.out.println("Embedding generation failed - got null or empty vector");
             throw new RuntimeException("Failed to generate embedding for query: " + query);
         }
+        System.out.println("Embedding generated successfully - dimension: " + queryVector.size());
         List<Float> queryVectorFloats = queryVector.stream().map(Double::floatValue).collect(Collectors.toList());
 
         var knnBuilder = SearchRequest.of(s -> {
@@ -106,7 +109,7 @@ public class VectorDatabaseService {
             // Add source filtering
             return knnQuery.source(src -> src
                     .filter(f -> f
-                            .includes("id", "title", "url", "image_url", "text_content", "metadata")
+                            .includes("id", "title", "url", "image_url", "description", "metadata")
                     )
             );
         });
@@ -122,7 +125,7 @@ public class VectorDatabaseService {
                 .query(buildTextQuery(query, filters))
                 .source(src -> src
                         .filter(f -> f
-                                .includes("id", "title", "url", "image_url", "text_content", "metadata")
+                                .includes("id", "title", "url", "image_url", "description", "metadata")
                         )
                 )
         );
@@ -136,7 +139,7 @@ public class VectorDatabaseService {
             mustClauses.add(Query.of(q -> q
                     .multiMatch(mm -> mm
                             .query(query)
-                            .fields("title^2", "text_content")
+                            .fields("title^2", "description")
                             .type(co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType.BestFields)
                     )
             ));
@@ -228,7 +231,7 @@ public class VectorDatabaseService {
                 com.ecommerce.search.SearchResponse.Product product = new com.ecommerce.search.SearchResponse.Product(
                         (String) source.get("id"),
                         (String) source.get("title"),
-                        (String) source.get("text_content"),
+                        (String) source.get("description"),
                         metadata.get("final_price") != null ? ((Number) metadata.get("final_price")).doubleValue() : 0.0,
                         (String) metadata.get("categories"),
                         (String) metadata.get("brand"),

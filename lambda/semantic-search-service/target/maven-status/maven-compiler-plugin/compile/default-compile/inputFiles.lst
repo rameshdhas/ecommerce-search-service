@@ -1,7 +1,7 @@
-/Users/rameshdhason/Developer/Workspaces/ecommerce-search-service/lambda/semantic-search-service/src/main/java/com/ecommerce/search/ElasticsearchConfig.java
-/Users/rameshdhason/Developer/Workspaces/ecommerce-search-service/lambda/semantic-search-service/src/main/java/com/ecommerce/search/EmbeddingService.java
-/Users/rameshdhason/Developer/Workspaces/ecommerce-search-service/lambda/semantic-search-service/src/main/java/com/ecommerce/search/SearchRequest.java
-/Users/rameshdhason/Developer/Workspaces/ecommerce-search-service/lambda/semantic-search-service/src/main/java/com/ecommerce/search/SearchResponse.java
-/Users/rameshdhason/Developer/Workspaces/ecommerce-search-service/lambda/semantic-search-service/src/main/java/com/ecommerce/search/SemanticSearchApplication.java
-/Users/rameshdhason/Developer/Workspaces/ecommerce-search-service/lambda/semantic-search-service/src/main/java/com/ecommerce/search/SemanticSearchService.java
-/Users/rameshdhason/Developer/Workspaces/ecommerce-search-service/lambda/semantic-search-service/src/main/java/com/ecommerce/search/VectorDatabaseService.java
+/asset-input/src/main/java/com/ecommerce/search/SearchResponse.java
+/asset-input/src/main/java/com/ecommerce/search/SemanticSearchApplication.java
+/asset-input/src/main/java/com/ecommerce/search/EmbeddingService.java
+/asset-input/src/main/java/com/ecommerce/search/ElasticsearchConfig.java
+/asset-input/src/main/java/com/ecommerce/search/SemanticSearchService.java
+/asset-input/src/main/java/com/ecommerce/search/VectorDatabaseService.java
+/asset-input/src/main/java/com/ecommerce/search/SearchRequest.java
