@@ -181,10 +181,11 @@ public class VectorDatabaseService {
         }
 
         if (filters.getBrand() != null && !filters.getBrand().trim().isEmpty()) {
+            // Use match query for case-insensitive brand matching
             mustClauses.add(Query.of(q -> q
-                    .term(t -> t
+                    .match(m -> m
                             .field("metadata.brand")
-                            .value(filters.getBrand())
+                            .query(filters.getBrand())
                     )
             ));
         }
