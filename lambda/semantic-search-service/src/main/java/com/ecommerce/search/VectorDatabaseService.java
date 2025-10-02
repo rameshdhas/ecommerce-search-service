@@ -276,9 +276,11 @@ public class VectorDatabaseService {
             List<com.ecommerce.search.SearchResponse.Product> products = new ArrayList<>();
 
             for (Hit<Object> hit : response.hits().hits()) {
+                @SuppressWarnings("unchecked")
                 Map<String, Object> source = (Map<String, Object>) hit.source();
                 double score = hit.score() != null ? hit.score() : 0.0;
 
+                @SuppressWarnings("unchecked")
                 Map<String, Object> metadata = (Map<String, Object>) source.get("metadata");
                 if (metadata == null) {
                     metadata = new HashMap<>();

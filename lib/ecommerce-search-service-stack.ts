@@ -36,17 +36,7 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
     const semanticSearchFunction = new lambda.Function(this, 'SemanticSearchFunction', {
       runtime: lambda.Runtime.JAVA_17,
       handler: 'org.springframework.cloud.function.adapter.aws.FunctionInvoker::handleRequest',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/semantic-search-service'), {
-        bundling: {
-          image: lambda.Runtime.JAVA_17.bundlingImage,
-          command: [
-            '/bin/sh',
-            '-c',
-            'mvn clean package -DskipTests && cp target/semantic-search-service-1.0.0.jar /asset-output/',
-          ],
-          user: 'root',
-        },
-      }),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/semantic-search-service/target/semantic-search-service-1.0.0.jar')),
       memorySize: 1024,
       timeout: cdk.Duration.seconds(30),
       role: lambdaRole,
@@ -68,7 +58,7 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
 
     // Create Lambda integration
     const lambdaIntegration = new apigateway.LambdaIntegration(semanticSearchFunction, {
-      requestTemplates: { 'application/json': '{ "statusCode": "200" }' },
+      proxy: true,
     });
 
     // Create the search resource and POST method
