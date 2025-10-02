@@ -164,6 +164,13 @@ public class VectorDatabaseService {
         return query.isMatchAll();
     }
 
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        return str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
+    }
+
     private Query buildFilterQuery(com.ecommerce.search.SearchRequest.SearchFilters filters) {
         if (filters == null) {
             return Query.of(q -> q.matchAll(ma -> ma));
@@ -172,21 +179,69 @@ public class VectorDatabaseService {
         List<Query> mustClauses = new ArrayList<>();
 
         if (filters.getCategory() != null && !filters.getCategory().trim().isEmpty()) {
-            mustClauses.add(Query.of(q -> q
-                    .term(t -> t
+            // Use bool query with should clauses for flexible category matching
+            // The categories field contains JSON array strings like: ["Kitchen & Dining","Small Appliances"]
+            List<Query> categoryQueries = new ArrayList<>();
+
+            String categoryTerm = filters.getCategory();
+
+            // Match query for flexible text matching
+            categoryQueries.add(Query.of(q -> q
+                    .match(m -> m
                             .field("metadata.categories")
-                            .value(filters.getCategory())
+                            .query(categoryTerm)
                     )
+            ));
+
+            // Wildcard queries for various case patterns since categories are stored as JSON strings
+            // Handle "kitchen" -> "Kitchen", "Kitchen & Dining", etc.
+            String[] variations = {
+                "*" + categoryTerm.toLowerCase() + "*",
+                "*" + categoryTerm.toUpperCase() + "*",
+                "*" + capitalize(categoryTerm) + "*",
+                "*" + capitalize(categoryTerm) + " &*"  // for "Kitchen & Dining" patterns
+            };
+
+            for (String variation : variations) {
+                categoryQueries.add(Query.of(q -> q
+                        .wildcard(w -> w
+                                .field("metadata.categories")
+                                .value(variation)
+                                .caseInsensitive(true)
+                        )
+                ));
+            }
+
+            // Add the combined query
+            mustClauses.add(Query.of(q -> q
+                    .bool(b -> b.should(categoryQueries))
             ));
         }
 
         if (filters.getBrand() != null && !filters.getBrand().trim().isEmpty()) {
-            // Use match query for case-insensitive brand matching
-            mustClauses.add(Query.of(q -> q
+            // Use bool query with should clauses for flexible brand matching
+            List<Query> brandQueries = new ArrayList<>();
+
+            // Match query for flexible text matching
+            brandQueries.add(Query.of(q -> q
                     .match(m -> m
                             .field("metadata.brand")
                             .query(filters.getBrand())
                     )
+            ));
+
+            // Wildcard query for partial matches
+            brandQueries.add(Query.of(q -> q
+                    .wildcard(w -> w
+                            .field("metadata.brand")
+                            .value("*" + filters.getBrand().toLowerCase() + "*")
+                            .caseInsensitive(true)
+                    )
+            ));
+
+            // Add the combined query
+            mustClauses.add(Query.of(q -> q
+                    .bool(b -> b.should(brandQueries))
             ));
         }
 
