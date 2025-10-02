@@ -1,9 +1,0 @@
-/asset-input/src/main/java/com/ecommerce/search/SearchResponse.java
-/asset-input/src/main/java/com/ecommerce/search/CorsConfig.java
-/asset-input/src/main/java/com/ecommerce/search/SemanticSearchApplication.java
-/asset-input/src/main/java/com/ecommerce/search/EmbeddingService.java
-/asset-input/src/main/java/com/ecommerce/search/SearchController.java
-/asset-input/src/main/java/com/ecommerce/search/ElasticsearchConfig.java
-/asset-input/src/main/java/com/ecommerce/search/SemanticSearchService.java
-/asset-input/src/main/java/com/ecommerce/search/VectorDatabaseService.java
-/asset-input/src/main/java/com/ecommerce/search/SearchRequest.java
