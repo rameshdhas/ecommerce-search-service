@@ -54,8 +54,8 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(30),
       role: lambdaRole,
       environment: {
-        ELASTICSEARCH_ENDPOINT: 'https://ecommerce-project-a814cd.es.us-east-1.aws.elastic.cloud:443',
-        ELASTICSEARCH_APIKEY: 'alBSNG41a0JUamwwcHZqNnoxaUs6Q2I0Ym5iNE14TkRvNEtDUXcyZF83Zw==',
+        ELASTICSEARCH_ENDPOINT: 'ELASTICSEARCH_ENDPOINT',
+        ELASTICSEARCH_APIKEY: 'ELASTICSEARCH_APIKEY',
         ELASTICSEARCH_INDEX: 'ecommerce-products',
         NODE_ENV: 'production',
       },
