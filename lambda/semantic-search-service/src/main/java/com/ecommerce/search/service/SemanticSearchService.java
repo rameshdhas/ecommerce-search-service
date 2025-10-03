@@ -1,5 +1,8 @@
-package com.ecommerce.search;
+package com.ecommerce.search.service;
 
+import com.ecommerce.search.dto.Product;
+import com.ecommerce.search.dto.SearchRequest;
+import com.ecommerce.search.dto.SearchResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.time.Instant;
@@ -19,7 +22,7 @@ public class SemanticSearchService {
         long startTime = Instant.now().toEpochMilli();
 
         try {
-            List<SearchResponse.Product> products = vectorDatabaseService.semanticSearch(
+            List<Product> products = vectorDatabaseService.semanticSearch(
                 request.getQuery(),
                 request.getLimit(),
                 request.getOffset(),

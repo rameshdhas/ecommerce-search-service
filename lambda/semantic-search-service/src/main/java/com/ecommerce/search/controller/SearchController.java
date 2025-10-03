@@ -1,5 +1,8 @@
-package com.ecommerce.search;
+package com.ecommerce.search.controller;
 
+import com.ecommerce.search.dto.SearchRequest;
+import com.ecommerce.search.dto.SearchResponse;
+import com.ecommerce.search.service.SemanticSearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 

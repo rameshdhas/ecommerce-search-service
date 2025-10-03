@@ -1,4 +1,4 @@
-package com.ecommerce.search;
+package com.ecommerce.search.config;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.json.jackson.JacksonJsonpMapper;

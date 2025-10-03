@@ -1,5 +1,8 @@
 package com.ecommerce.search;
 
+import com.ecommerce.search.dto.SearchRequest;
+import com.ecommerce.search.dto.SearchResponse;
+import com.ecommerce.search.service.SemanticSearchService;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;

@@ -1,4 +1,4 @@
-package com.ecommerce.search;
+package com.ecommerce.search.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;

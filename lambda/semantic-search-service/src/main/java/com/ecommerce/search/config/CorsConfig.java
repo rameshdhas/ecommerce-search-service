@@ -1,4 +1,4 @@
-package com.ecommerce.search;
+package com.ecommerce.search.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

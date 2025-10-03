@@ -1,10 +1,11 @@
-package com.ecommerce.search;
+package com.ecommerce.search.service;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.query_dsl.*;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import com.ecommerce.search.dto.Product;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +35,7 @@ public class VectorDatabaseService {
         this.objectMapper = new ObjectMapper();
     }
 
-    public List<com.ecommerce.search.SearchResponse.Product> semanticSearch(String query, Integer limit, Integer offset, com.ecommerce.search.SearchRequest.SearchFilters filters) {
+    public List<Product> semanticSearch(String query, Integer limit, Integer offset, com.ecommerce.search.dto.SearchRequest.SearchFilters filters) {
         try {
             // Try vector search first, fallback to text search if vector fields don't exist
             SearchRequest searchRequest;
@@ -59,7 +60,7 @@ public class VectorDatabaseService {
         }
     }
 
-    public long getTotalCount(String query, com.ecommerce.search.SearchRequest.SearchFilters filters) {
+    public long getTotalCount(String query, com.ecommerce.search.dto.SearchRequest.SearchFilters filters) {
         try {
             SearchRequest searchRequest = SearchRequest.of(s -> s
                     .index(indexName)
@@ -76,7 +77,7 @@ public class VectorDatabaseService {
         }
     }
 
-    private SearchRequest buildVectorSearchRequest(String query, Integer limit, Integer offset, com.ecommerce.search.SearchRequest.SearchFilters filters) {
+    private SearchRequest buildVectorSearchRequest(String query, Integer limit, Integer offset, com.ecommerce.search.dto.SearchRequest.SearchFilters filters) {
         System.out.println("Generating embedding for query: " + query);
         List<Double> queryVector = embeddingService.generateEmbedding(query);
         if (queryVector == null || queryVector.isEmpty()) {
@@ -117,7 +118,7 @@ public class VectorDatabaseService {
         return knnBuilder;
     }
 
-    private SearchRequest buildTextSearchRequest(String query, Integer limit, Integer offset, com.ecommerce.search.SearchRequest.SearchFilters filters) {
+    private SearchRequest buildTextSearchRequest(String query, Integer limit, Integer offset, com.ecommerce.search.dto.SearchRequest.SearchFilters filters) {
         return SearchRequest.of(s -> s
                 .index(indexName)
                 .size(limit)
@@ -131,7 +132,7 @@ public class VectorDatabaseService {
         );
     }
 
-    private Query buildTextQuery(String query, com.ecommerce.search.SearchRequest.SearchFilters filters) {
+    private Query buildTextQuery(String query, com.ecommerce.search.dto.SearchRequest.SearchFilters filters) {
         List<Query> mustClauses = new ArrayList<>();
 
         // Add text search if query is provided
@@ -171,7 +172,7 @@ public class VectorDatabaseService {
         return str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
     }
 
-    private Query buildFilterQuery(com.ecommerce.search.SearchRequest.SearchFilters filters) {
+    private Query buildFilterQuery(com.ecommerce.search.dto.SearchRequest.SearchFilters filters) {
         if (filters == null) {
             return Query.of(q -> q.matchAll(ma -> ma));
         }
@@ -271,9 +272,9 @@ public class VectorDatabaseService {
 
 
 
-    private List<com.ecommerce.search.SearchResponse.Product> parseSearchResults(SearchResponse<Object> response) {
+    private List<Product> parseSearchResults(SearchResponse<Object> response) {
         try {
-            List<com.ecommerce.search.SearchResponse.Product> products = new ArrayList<>();
+            List<Product> products = new ArrayList<>();
 
             for (Hit<Object> hit : response.hits().hits()) {
                 @SuppressWarnings("unchecked")
@@ -286,7 +287,7 @@ public class VectorDatabaseService {
                     metadata = new HashMap<>();
                 }
 
-                com.ecommerce.search.SearchResponse.Product product = new com.ecommerce.search.SearchResponse.Product(
+                Product product = new Product(
                         (String) source.get("id"),
                         (String) source.get("title"),
                         (String) source.get("description"),

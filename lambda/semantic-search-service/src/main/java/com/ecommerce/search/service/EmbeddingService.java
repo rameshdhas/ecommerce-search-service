@@ -1,4 +1,4 @@
-package com.ecommerce.search;
+package com.ecommerce.search.service;
 
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.core.SdkBytes;
