@@ -23,16 +23,16 @@ public class SemanticSearchService {
 
         try {
             List<Product> products = vectorDatabaseService.semanticSearch(
-                request.getQuery(),
-                request.getLimit(),
-                request.getOffset(),
-                request.getFilters()
+                request.query(),
+                request.limit(),
+                request.offset(),
+                request.filters()
             );
 
-            long total = vectorDatabaseService.getTotalCount(request.getQuery(), request.getFilters());
+            long total = vectorDatabaseService.getTotalCount(request.query(), request.filters());
             long processingTime = Instant.now().toEpochMilli() - startTime;
 
-            return new SearchResponse(products, total, request.getLimit(), request.getOffset(), processingTime);
+            return new SearchResponse(products, total, request.limit(), request.offset(), processingTime);
 
         } catch (Exception e) {
             System.out.println("Search error: " + e.getMessage());

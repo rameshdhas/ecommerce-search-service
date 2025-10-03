@@ -6,6 +6,7 @@ import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.ecommerce.search.dto.Product;
+import com.ecommerce.search.dto.SearchFilters;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +36,7 @@ public class VectorDatabaseService {
         this.objectMapper = new ObjectMapper();
     }
 
-    public List<Product> semanticSearch(String query, Integer limit, Integer offset, com.ecommerce.search.dto.SearchRequest.SearchFilters filters) {
+    public List<Product> semanticSearch(String query, Integer limit, Integer offset, SearchFilters filters) {
         try {
             // Try vector search first, fallback to text search if vector fields don't exist
             SearchRequest searchRequest;
@@ -60,7 +61,7 @@ public class VectorDatabaseService {
         }
     }
 
-    public long getTotalCount(String query, com.ecommerce.search.dto.SearchRequest.SearchFilters filters) {
+    public long getTotalCount(String query, SearchFilters filters) {
         try {
             SearchRequest searchRequest = SearchRequest.of(s -> s
                     .index(indexName)
@@ -77,7 +78,7 @@ public class VectorDatabaseService {
         }
     }
 
-    private SearchRequest buildVectorSearchRequest(String query, Integer limit, Integer offset, com.ecommerce.search.dto.SearchRequest.SearchFilters filters) {
+    private SearchRequest buildVectorSearchRequest(String query, Integer limit, Integer offset, SearchFilters filters) {
         System.out.println("Generating embedding for query: " + query);
         List<Double> queryVector = embeddingService.generateEmbedding(query);
         if (queryVector == null || queryVector.isEmpty()) {
@@ -118,7 +119,7 @@ public class VectorDatabaseService {
         return knnBuilder;
     }
 
-    private SearchRequest buildTextSearchRequest(String query, Integer limit, Integer offset, com.ecommerce.search.dto.SearchRequest.SearchFilters filters) {
+    private SearchRequest buildTextSearchRequest(String query, Integer limit, Integer offset, SearchFilters filters) {
         return SearchRequest.of(s -> s
                 .index(indexName)
                 .size(limit)
@@ -132,7 +133,7 @@ public class VectorDatabaseService {
         );
     }
 
-    private Query buildTextQuery(String query, com.ecommerce.search.dto.SearchRequest.SearchFilters filters) {
+    private Query buildTextQuery(String query, SearchFilters filters) {
         List<Query> mustClauses = new ArrayList<>();
 
         // Add text search if query is provided
@@ -172,19 +173,19 @@ public class VectorDatabaseService {
         return str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
     }
 
-    private Query buildFilterQuery(com.ecommerce.search.dto.SearchRequest.SearchFilters filters) {
+    private Query buildFilterQuery(SearchFilters filters) {
         if (filters == null) {
             return Query.of(q -> q.matchAll(ma -> ma));
         }
 
         List<Query> mustClauses = new ArrayList<>();
 
-        if (filters.getCategory() != null && !filters.getCategory().trim().isEmpty()) {
+        if (filters.category() != null && !filters.category().trim().isEmpty()) {
             // Use bool query with should clauses for flexible category matching
             // The categories field contains JSON array strings like: ["Kitchen & Dining","Small Appliances"]
             List<Query> categoryQueries = new ArrayList<>();
 
-            String categoryTerm = filters.getCategory();
+            String categoryTerm = filters.category();
 
             // Match query for flexible text matching
             categoryQueries.add(Query.of(q -> q
@@ -219,7 +220,7 @@ public class VectorDatabaseService {
             ));
         }
 
-        if (filters.getBrand() != null && !filters.getBrand().trim().isEmpty()) {
+        if (filters.brand() != null && !filters.brand().trim().isEmpty()) {
             // Use bool query with should clauses for flexible brand matching
             List<Query> brandQueries = new ArrayList<>();
 
@@ -227,7 +228,7 @@ public class VectorDatabaseService {
             brandQueries.add(Query.of(q -> q
                     .match(m -> m
                             .field("metadata.brand")
-                            .query(filters.getBrand())
+                            .query(filters.brand())
                     )
             ));
 
@@ -235,7 +236,7 @@ public class VectorDatabaseService {
             brandQueries.add(Query.of(q -> q
                     .wildcard(w -> w
                             .field("metadata.brand")
-                            .value("*" + filters.getBrand().toLowerCase() + "*")
+                            .value("*" + filters.brand().toLowerCase() + "*")
                             .caseInsensitive(true)
                     )
             ));
@@ -246,15 +247,15 @@ public class VectorDatabaseService {
             ));
         }
 
-        if (filters.getPriceMin() != null || filters.getPriceMax() != null) {
+        if (filters.priceMin() != null || filters.priceMax() != null) {
             mustClauses.add(Query.of(q -> q
                     .range(r -> {
                         var rangeQuery = r.field("metadata.final_price");
-                        if (filters.getPriceMin() != null) {
-                            rangeQuery.gte(co.elastic.clients.json.JsonData.of(filters.getPriceMin()));
+                        if (filters.priceMin() != null) {
+                            rangeQuery.gte(co.elastic.clients.json.JsonData.of(filters.priceMin()));
                         }
-                        if (filters.getPriceMax() != null) {
-                            rangeQuery.lte(co.elastic.clients.json.JsonData.of(filters.getPriceMax()));
+                        if (filters.priceMax() != null) {
+                            rangeQuery.lte(co.elastic.clients.json.JsonData.of(filters.priceMax()));
                         }
                         return rangeQuery;
                     })
