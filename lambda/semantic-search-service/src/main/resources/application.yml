@@ -9,8 +9,8 @@ spring:
     enabled: false
 
 elasticsearch:
-  endpoint: ${ELASTICSEARCH_ENDPOINT:https://ecommerce-project-a814cd.es.us-east-1.aws.elastic.cloud:443}
-  apikey: ${ELASTICSEARCH_APIKEY:alBSNG41a0JUamwwcHZqNnoxaUs6Q2I0Ym5iNE14TkRvNEtDUXcyZF83Zw==}
+  endpoint: ${ELASTICSEARCH_ENDPOINT:https://host.aws.elastic.cloud:443}
+  apikey: ${ELASTICSEARCH_APIKEY:apikewrwenbsdfshdfhsdfg==}
   index: ${ELASTICSEARCH_INDEX:ecommerce-products}
 
 logging:
