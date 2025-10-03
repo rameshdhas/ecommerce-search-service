@@ -1,0 +1,23 @@
+spring:
+  profiles:
+    active: test
+
+elasticsearch:
+  host: test-host
+  port: 9200
+  scheme: http
+  index: test-ecommerce-products
+
+logging:
+  level:
+    com.ecommerce.search: DEBUG
+    org.springframework.cloud.function: DEBUG
+
+aws:
+  region: us-east-1
+
+# Disable AWS credential loading during tests
+cloud:
+  aws:
+    credentials:
+      useDefaultAwsCredentialsChain: false
