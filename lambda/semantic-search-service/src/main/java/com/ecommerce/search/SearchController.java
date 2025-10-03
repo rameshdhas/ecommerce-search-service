@@ -20,17 +20,4 @@ public class SearchController {
         return searchService.search(request);
     }
 
-    @GetMapping("/semantic")
-    public SearchResponse semanticSearchGet(
-            @RequestParam String query,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestParam(defaultValue = "0") int offset) {
-
-        SearchRequest request = new SearchRequest();
-        request.setQuery(query);
-        request.setLimit(limit);
-        request.setOffset(offset);
-
-        return searchService.search(request);
-    }
 }

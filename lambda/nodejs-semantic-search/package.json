@@ -1,0 +1,20 @@
+{
+  "name": "nodejs-semantic-search",
+  "version": "1.0.0",
+  "description": "Node.js Lambda function for ecommerce semantic search",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm install",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@elastic/elasticsearch": "^8.11.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.460.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

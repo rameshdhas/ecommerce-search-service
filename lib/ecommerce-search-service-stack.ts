@@ -32,7 +32,7 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
       },
     });
 
-    // Create the Lambda function
+    // Create the Java Lambda function
     const semanticSearchFunction = new lambda.Function(this, 'SemanticSearchFunction', {
       runtime: lambda.Runtime.JAVA_17,
       handler: 'org.springframework.cloud.function.adapter.aws.FunctionInvoker::handleRequest',
@@ -42,6 +42,22 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
       role: lambdaRole,
       environment: {
         SPRING_CLOUD_FUNCTION_DEFINITION: 'semanticSearch',
+      },
+    });
+
+    // Create the Node.js Lambda function
+    const nodeSemanticSearchFunction = new lambda.Function(this, 'NodeSemanticSearchFunction', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/nodejs-semantic-search')),
+      memorySize: 1024,
+      timeout: cdk.Duration.seconds(30),
+      role: lambdaRole,
+      environment: {
+        ELASTICSEARCH_ENDPOINT: 'https://ecommerce-project-a814cd.es.us-east-1.aws.elastic.cloud:443',
+        ELASTICSEARCH_APIKEY: 'alBSNG41a0JUamwwcHZqNnoxaUs6Q2I0Ym5iNE14TkRvNEtDUXcyZF83Zw==',
+        ELASTICSEARCH_INDEX: 'ecommerce-products',
+        NODE_ENV: 'production',
       },
     });
 
@@ -56,14 +72,22 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
       },
     });
 
-    // Create Lambda integration
+    // Create Lambda integrations
     const lambdaIntegration = new apigateway.LambdaIntegration(semanticSearchFunction, {
       proxy: true,
     });
 
-    // Create the search resource and POST method
+    const nodeLambdaIntegration = new apigateway.LambdaIntegration(nodeSemanticSearchFunction, {
+      proxy: true,
+    });
+
+    // Create the search resource and POST method (Java Lambda)
     const searchResource = api.root.addResource('search');
     searchResource.addMethod('POST', lambdaIntegration);
+
+    // Create the node-search resource and POST method (Node.js Lambda)
+    const nodeSearchResource = api.root.addResource('node-search');
+    nodeSearchResource.addMethod('POST', nodeLambdaIntegration);
 
     // Output the API endpoint
     new cdk.CfnOutput(this, 'ApiEndpoint', {
@@ -71,10 +95,20 @@ export class EcommerceSearchServiceStack extends cdk.Stack {
       description: 'API Gateway endpoint URL',
     });
 
-    // Output the Lambda function name
+    // Output the Lambda function names
     new cdk.CfnOutput(this, 'LambdaFunctionName', {
       value: semanticSearchFunction.functionName,
-      description: 'Lambda function name',
+      description: 'Java Lambda function name',
+    });
+
+    new cdk.CfnOutput(this, 'NodeLambdaFunctionName', {
+      value: nodeSemanticSearchFunction.functionName,
+      description: 'Node.js Lambda function name',
+    });
+
+    new cdk.CfnOutput(this, 'NodeSearchEndpoint', {
+      value: `${api.url}node-search`,
+      description: 'Node.js Lambda API endpoint',
     });
   }
 }
